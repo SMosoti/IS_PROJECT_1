@@ -14,7 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $new_status = $_POST["new_status"];
 
     if ($new_status == "delivered") {
-        // If delivered update both delivery and claim and food listing
+        // Update delivery status and timestamp
         pg_query_params($conn,
             "UPDATE deliveries SET status = $1, delivered_at = CURRENT_TIMESTAMP WHERE id = $2",
             array($new_status, $delivery_id)
@@ -62,14 +62,19 @@ $deliveries = pg_query_params($conn,
         deliveries.assigned_at,
         deliveries.delivered_at,
         claims.pickup_date,
+        claims.recipient_phone,
         food_listings.food_name,
         food_listings.quantity,
         food_listings.unit,
         food_listings.notes,
         donor.full_name AS donor_name,
         donor.location AS pickup_location,
+        donor.latitude AS donor_lat,
+        donor.longitude AS donor_lng,
         recipient.full_name AS recipient_name,
-        recipient.location AS dropoff_location
+        recipient.location AS dropoff_location,
+        recipient.latitude AS recipient_lat,
+        recipient.longitude AS recipient_lng
      FROM deliveries
      JOIN claims ON deliveries.claim_id = claims.id
      JOIN food_listings ON claims.listing_id = food_listings.id
@@ -92,7 +97,6 @@ $deliveries = pg_query_params($conn,
 </head>
 <body>
 
-<!-- Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-warning">
     <div class="container">
         <a class="navbar-brand text-dark" href="#">Food Relief System — Rider</a>
@@ -133,6 +137,17 @@ $deliveries = pg_query_params($conn,
                             <?php if ($row["notes"]): ?>
                                 <p class="mb-1"><strong>Notes:</strong> <?php echo $row["notes"]; ?></p>
                             <?php endif; ?>
+                            <?php if ($row["donor_lat"] && $row["donor_lng"]): ?>
+                                <a href="https://www.google.com/maps?q=<?php echo $row["donor_lat"]; ?>,<?php echo $row["donor_lng"]; ?>" 
+                                   target="_blank" class="btn btn-outline-primary btn-sm mt-2">
+                                   Open Exact Pickup in Google Maps
+                                </a>
+                            <?php else: ?>
+                                <a href="https://www.google.com/maps/search/<?php echo urlencode($row["pickup_location"]); ?>" 
+                                   target="_blank" class="btn btn-outline-secondary btn-sm mt-2">
+                                   Search Pickup in Google Maps
+                                </a>
+                            <?php endif; ?>
                         </div>
 
                         <!-- Dropoff details -->
@@ -140,8 +155,25 @@ $deliveries = pg_query_params($conn,
                             <h6 class="text-muted">DROP OFF</h6>
                             <p class="mb-1"><strong>Recipient:</strong> <?php echo $row["recipient_name"]; ?></p>
                             <p class="mb-1"><strong>Location:</strong> <?php echo $row["dropoff_location"]; ?></p>
+                            <?php if ($row["recipient_phone"]): ?>
+                                <p class="mb-1">
+                                    <strong>Phone:</strong> 
+                                    <a href="tel:<?php echo $row["recipient_phone"]; ?>"><?php echo $row["recipient_phone"]; ?></a>
+                                </p>
+                            <?php endif; ?>
                             <?php if ($row["delivered_at"]): ?>
                                 <p class="mb-1"><strong>Delivered At:</strong> <?php echo date("d M Y H:i", strtotime($row["delivered_at"])); ?></p>
+                            <?php endif; ?>
+                            <?php if ($row["recipient_lat"] && $row["recipient_lng"]): ?>
+                                <a href="https://www.google.com/maps?q=<?php echo $row["recipient_lat"]; ?>,<?php echo $row["recipient_lng"]; ?>" 
+                                   target="_blank" class="btn btn-outline-primary btn-sm mt-2">
+                                   Open Exact Dropoff in Google Maps
+                                </a>
+                            <?php else: ?>
+                                <a href="https://www.google.com/maps/search/<?php echo urlencode($row["dropoff_location"]); ?>" 
+                                   target="_blank" class="btn btn-outline-secondary btn-sm mt-2">
+                                   Search Dropoff in Google Maps
+                                </a>
                             <?php endif; ?>
                         </div>
 

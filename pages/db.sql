@@ -43,3 +43,7 @@ CREATE TABLE deliveries (
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     delivered_at TIMESTAMP
 );
+
+ALTER TABLE users 
+ADD COLUMN latitude DECIMAL(10, 8),
+ADD COLUMN longitude DECIMAL(11, 8);

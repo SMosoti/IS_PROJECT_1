@@ -34,13 +34,22 @@ $error = "";
 // Handle claim form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $pickup_date = $_POST["pickup_date"];
+    $recipient_phone = trim($_POST["recipient_phone"]);
     $recipient_id = $_SESSION["user_id"];
 
-    // Insert claim into claims table
+    // Handle location if provided
+    if (isset($_POST["latitude"]) && $_POST["latitude"] != "") {
+        pg_query_params($conn,
+            "UPDATE users SET latitude = $1, longitude = $2 WHERE id = $3",
+            array($_POST["latitude"], $_POST["longitude"], $recipient_id)
+        );
+    }
+
+    // Insert claim
     $claim = pg_query_params($conn,
-        "INSERT INTO claims (listing_id, recipient_id, pickup_date)
-         VALUES ($1, $2, $3)",
-        array($listing_id, $recipient_id, $pickup_date)
+        "INSERT INTO claims (listing_id, recipient_id, pickup_date, recipient_phone)
+         VALUES ($1, $2, $3, $4)",
+        array($listing_id, $recipient_id, $pickup_date, $recipient_phone)
     );
 
     // Update food listing status to claimed
@@ -50,10 +59,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     );
 
     if ($claim) {
-    $success = "You have successfully claimed this listing! The donor will be notified.";
-} else {
-    $error = "Something went wrong: " . pg_last_error($conn);
-}
+        $success = "You have successfully claimed this listing! The donor will be notified.";
+    } else {
+        $error = "Something went wrong: " . pg_last_error($conn);
+    }
 }
 ?>
 
@@ -68,7 +77,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 
-<!-- Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-success">
     <div class="container">
         <a class="navbar-brand" href="#">Food Relief System</a>
@@ -108,12 +116,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
 
                     <!-- Claim form -->
-                    <form method="POST" action="claim.php?listing_id=<?php echo $listing_id; ?>">
+                    <form method="POST" action="claim.php?listing_id=<?php echo $listing_id; ?>" id="claim-form">
 
                         <div class="mb-3">
                             <label class="form-label">Preferred Pickup Date</label>
                             <input type="date" name="pickup_date" class="form-control" required>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Your Phone Number</label>
+                            <input type="text" name="recipient_phone" class="form-control" placeholder="e.g. 0712345678" required>
+                            <small class="text-muted">The rider will call you on arrival.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Your Dropoff Location</label>
+                            <input type="text" name="manual_location" id="manual_location" class="form-control" placeholder="e.g. Kibera, Nairobi">
+                            <small class="text-muted">Type your location or detect it automatically below.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-success w-100" onclick="getLocation()">
+                                Detect My Location Automatically
+                            </button>
+                            <div id="location-status" class="mt-2"></div>
+                        </div>
+
+                        <input type="hidden" name="latitude" id="latitude">
+                        <input type="hidden" name="longitude" id="longitude">
 
                         <button type="submit" class="btn btn-success w-100">Confirm Claim</button>
                         <a href="recipient-dashboard.php" class="btn btn-outline-secondary w-100 mt-2">Cancel</a>
@@ -126,6 +156,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
 </div>
+
+<script>
+function getLocation() {
+    if (navigator.geolocation) {
+        document.getElementById("location-status").innerHTML = '<small class="text-muted">Detecting location...</small>';
+        navigator.geolocation.getCurrentPosition(function(position) {
+            document.getElementById("latitude").value = position.coords.latitude;
+            document.getElementById("longitude").value = position.coords.longitude;
+            document.getElementById("location-status").innerHTML = '<small class="text-success">✓ Location detected successfully!</small>';
+        }, function(error) {
+            document.getElementById("location-status").innerHTML = '<small class="text-danger">Could not detect location. Please type it manually.</small>';
+        });
+    } else {
+        document.getElementById("location-status").innerHTML = '<small class="text-danger">Your browser does not support location detection.</small>';
+    }
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

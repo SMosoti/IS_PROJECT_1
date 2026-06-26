@@ -8,8 +8,19 @@ if (!isset($_SESSION["user_id"]) || $_SESSION["user_role"] != "donor") {
     exit();
 }
 
+// Handle location update
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["latitude"])) {
+    $latitude = $_POST["latitude"];
+    $longitude = $_POST["longitude"];
+
+    pg_query_params($conn,
+        "UPDATE users SET latitude = $1, longitude = $2 WHERE id = $3",
+        array($latitude, $longitude, $_SESSION["user_id"])
+    );
+}
+
 // Handle new food listing submission
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["food_name"])) {
     $food_name = trim($_POST["food_name"]);
     $quantity = $_POST["quantity"];
     $unit = $_POST["unit"];
@@ -30,6 +41,13 @@ $listings = pg_query_params($conn,
     "SELECT * FROM food_listings WHERE donor_id = $1 ORDER BY created_at DESC",
     array($_SESSION["user_id"])
 );
+
+// Get donor location
+$loc = pg_query_params($conn,
+    "SELECT location, latitude, longitude FROM users WHERE id = $1",
+    array($_SESSION["user_id"])
+);
+$loc_row = pg_fetch_assoc($loc);
 ?>
 
 <!DOCTYPE html>
@@ -43,7 +61,6 @@ $listings = pg_query_params($conn,
 </head>
 <body>
 
-<!-- Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-success">
     <div class="container">
         <a class="navbar-brand" href="#">Food Relief System</a>
@@ -103,6 +120,33 @@ $listings = pg_query_params($conn,
                     <button type="submit" class="btn btn-success w-100">Submit Listing</button>
                 </form>
             </div>
+
+            <!-- Donor Location Card -->
+            <div class="card shadow-sm p-4">
+                <h5 class="mb-3">My Pickup Location</h5>
+                <p class="text-muted">Set your exact location so riders know where to collect food.</p>
+
+                <?php if ($loc_row["latitude"] && $loc_row["longitude"]): ?>
+                    <div class="alert alert-success">
+                        ✓ Exact pickup location is set — riders can find you on Google Maps.
+                        <br>
+                        <small>Coordinates: <?php echo $loc_row["latitude"]; ?>, <?php echo $loc_row["longitude"]; ?></small>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-warning">
+                        No exact location set yet. Riders will use your text address instead.
+                    </div>
+                <?php endif; ?>
+
+                <button class="btn btn-success" onclick="getLocation()">
+                    Detect My Location Automatically
+                </button>
+
+                <form method="POST" action="donor-dashboard.php" id="location-form">
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                </form>
+            </div>
         </div>
 
         <!-- Right: Donor's listings -->
@@ -151,6 +195,22 @@ $listings = pg_query_params($conn,
 
     </div>
 </div>
+
+<script>
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            document.getElementById("latitude").value = position.coords.latitude;
+            document.getElementById("longitude").value = position.coords.longitude;
+            document.getElementById("location-form").submit();
+        }, function(error) {
+            alert("Could not get location. Please allow location access in your browser.");
+        });
+    } else {
+        alert("Your browser does not support location detection.");
+    }
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
