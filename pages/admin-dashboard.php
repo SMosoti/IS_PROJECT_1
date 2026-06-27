@@ -19,7 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     );
 }
 
-// Get all non-admin users
+// Get all non-admin users in the dashboard
 $users = pg_query($conn,
     "SELECT id, full_name, email, role, location, status, created_at 
      FROM users 
